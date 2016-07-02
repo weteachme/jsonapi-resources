@@ -5,7 +5,8 @@ module JSONAPI
   class RequestParser
     attr_accessor :fields, :include, :filters, :sort_criteria, :errors, :operations,
                   :resource_klass, :context, :paginator, :source_klass, :source_id,
-                  :include_directives, :params, :warnings, :server_error_callbacks
+                  :include_directives, :params, :warnings, :server_error_callbacks,
+                  :modules
 
     def initialize(params = nil, options = {})
       @params = params
@@ -23,6 +24,7 @@ module JSONAPI
       @paginator = nil
       @id = nil
       @server_error_callbacks = options.fetch(:server_error_callbacks, [])
+      @modules = options.fetch(:modules, '')
 
       setup_action(@params)
     end
@@ -30,7 +32,7 @@ module JSONAPI
     def setup_action(params)
       return if params.nil?
 
-      @resource_klass ||= Resource.resource_for(params[:controller]) if params[:controller]
+      @resource_klass ||= Resource.resource_for(params[:controller], @modules) if params[:controller]
 
       setup_action_method_name = "setup_#{params[:action]}_action"
       if respond_to?(setup_action_method_name)
@@ -133,7 +135,7 @@ module JSONAPI
     end
 
     def initialize_source(params)
-      @source_klass = Resource.resource_for(params.require(:source))
+      @source_klass = Resource.resource_for(params.require(:source), @modules)
       @source_id = @source_klass.verify_key(params.require(@source_klass._as_parent_key), @context)
     end
 
@@ -167,7 +169,7 @@ module JSONAPI
           if type != format_key(type)
             fail JSONAPI::Exceptions::InvalidResource.new(type)
           end
-          type_resource = Resource.resource_for(@resource_klass.module_path + underscored_type.to_s)
+          type_resource = Resource.resource_for(@resource_klass.module_path + underscored_type.to_s, @modules)
         rescue NameError
           @errors.concat(JSONAPI::Exceptions::InvalidResource.new(type).errors)
         rescue JSONAPI::Exceptions::InvalidResource => e
@@ -201,7 +203,7 @@ module JSONAPI
       relationship = resource_klass._relationship(relationship_name)
       if relationship && format_key(relationship_name) == include_parts.first
         unless include_parts.last.empty?
-          check_include(Resource.resource_for(@resource_klass.module_path + relationship.class_name.to_s.underscore), include_parts.last.partition('.'))
+          check_include(Resource.resource_for(@resource_klass.module_path + relationship.class_name.to_s.underscore, @modules), include_parts.last.partition('.'))
         end
       else
         @errors.concat(JSONAPI::Exceptions::InvalidInclude.new(format_key(resource_klass._type),
@@ -439,9 +441,9 @@ module JSONAPI
         when 'id'
           checked_attributes['id'] = unformat_value(:id, value)
         when 'attributes'
-          value.each do |key, value|
-            param = unformat_key(key)
-            checked_attributes[param] = unformat_value(param, value)
+          value.each do |k, v|
+            param = unformat_key(k)
+            checked_attributes[param] = unformat_value(param, v)
           end
         end
       end
@@ -467,7 +469,7 @@ module JSONAPI
 
       unless links_object[:id].nil?
         resource = self.resource_klass || Resource
-        relationship_resource = resource.resource_for(unformat_key(links_object[:type]).to_s)
+        relationship_resource = resource.resource_for(unformat_key(links_object[:type]).to_s, @modules)
         relationship_id = relationship_resource.verify_key(links_object[:id], @context)
         if relationship.polymorphic?
           { id: relationship_id, type: unformat_key(links_object[:type].to_s) }
@@ -502,7 +504,7 @@ module JSONAPI
         end
 
         links_object.each_pair do |type, keys|
-          relationship_resource = Resource.resource_for(@resource_klass.module_path + unformat_key(type).to_s)
+          relationship_resource = Resource.resource_for(@resource_klass.module_path + unformat_key(type).to_s, @modules)
           add_result.call relationship_resource.verify_keys(keys, @context)
         end
       end

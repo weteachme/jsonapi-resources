@@ -131,6 +131,16 @@ class ResourceTest < ActiveSupport::TestCase
     assert_equal(MyModule::MyNamespacedResource.resource_for('my_module/related'), MyModule::RelatedResource)
   end
 
+  def test_resource_for_with_namespaced_paths_with_modules
+    assert_equal(JSONAPI::Resource.resource_for('my_module/related', 'v1/my_module'), V1::MyModule::RelatedResource)
+    assert_equal(PostResource.resource_for('my_module/related', 'v1/my_module'), V1::MyModule::RelatedResource)
+    assert_equal(MyModule::MyNamespacedResource.resource_for('my_module/related', 'v1/my_module'), V1::MyModule::RelatedResource)
+
+    assert_equal(JSONAPI::Resource.resource_for('related', 'v1/my_module'), V1::MyModule::RelatedResource)
+    assert_equal(PostResource.resource_for('related', 'v1/my_module'), V1::MyModule::RelatedResource)
+    assert_equal(MyModule::MyNamespacedResource.resource_for('related', 'v1/my_module'), V1::MyModule::RelatedResource)
+  end
+
   def test_resource_for_resource_does_not_exist_at_root
     assert_raises NameError do
       ArticleResource.resource_for('related')
@@ -509,7 +519,7 @@ LEFT JOIN people AS author_sorting ON author_sorting.id = posts.author_id", resu
         end
       CODE
     end
-    assert_match /DEPRECATION WARNING: Id without format is no longer supported. Please remove ids from attributes, or specify a format./, err
+    assert_match(/DEPRECATION WARNING: Id without format is no longer supported. Please remove ids from attributes, or specify a format./, err)
   end
 
   def test_id_attr_with_format
@@ -527,7 +537,7 @@ LEFT JOIN people AS author_sorting ON author_sorting.id = posts.author_id", resu
     _out, err = capture_io do
       eval "class LinksResource < JSONAPI::Resource; end"
     end
-    assert_match /LinksResource` is a reserved resource name/, err
+    assert_match(/LinksResource` is a reserved resource name/, err)
   end
 
   def test_reserved_key_warnings
@@ -538,7 +548,7 @@ LEFT JOIN people AS author_sorting ON author_sorting.id = posts.author_id", resu
         end
       CODE
     end
-    assert_match /`type` is a reserved key in ./, err
+    assert_match(/`type` is a reserved key in ./, err)
   end
 
   def test_reserved_relationship_warnings
@@ -550,7 +560,7 @@ LEFT JOIN people AS author_sorting ON author_sorting.id = posts.author_id", resu
           end
         CODE
       end
-      assert_match /`#{key}` is a reserved relationship name in ./, err
+      assert_match(/`#{key}` is a reserved relationship name in ./, err)
     end
     %w(types ids).each do |key|
       _out, err = capture_io do
@@ -560,7 +570,7 @@ LEFT JOIN people AS author_sorting ON author_sorting.id = posts.author_id", resu
           end
         CODE
       end
-      assert_match /`#{key}` is a reserved relationship name in ./, err
+      assert_match(/`#{key}` is a reserved relationship name in ./, err)
     end
   end
 
@@ -598,7 +608,8 @@ LEFT JOIN people AS author_sorting ON author_sorting.id = posts.author_id", resu
 
   def test_resource_for_model_use_hint
     special_person = Person.create!(name: 'Special', date_joined: Date.today, special: true)
-    special_resource = SpecialPersonResource.new(special_person, nil)
+    #special_resource = SpecialPersonResource.new(special_person, nil)
+    SpecialPersonResource.new(special_person, nil)
     resource_model = SpecialPersonResource.records({}).first # simulate a find
     assert_equal(SpecialPersonResource, SpecialPersonResource.resource_for_model(resource_model))
   end

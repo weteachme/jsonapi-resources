@@ -343,11 +343,22 @@ module JSONAPI
         check_reserved_resource_name(subclass._type, subclass.name)
       end
 
-      def resource_for(type)
-        type_with_module = type.include?('/') ? type : module_path + type
+      def resource_for(type, module_prefix = '')
 
+        type_only = type.split('/').last
+
+        type_with_module = module_prefix + type_only
         resource_name = _resource_name_from_type(type_with_module)
+
         resource = resource_name.safe_constantize if resource_name
+
+        if resource.nil?
+
+          type_with_module = type.include?('/') ? type : module_path + type
+
+          resource_name = _resource_name_from_type(type_with_module)
+          resource = resource_name.safe_constantize if resource_name
+        end
         if resource.nil?
           fail NameError, "JSONAPI: Could not find resource '#{type}'. (Class #{resource_name} not found)"
         end
@@ -437,7 +448,7 @@ module JSONAPI
       def has_one(*attrs)
         _add_relationship(Relationship::ToOne, *attrs)
       end
-      
+
       def belongs_to(*attrs)
         ActiveSupport::Deprecation.warn "In #{name} you exposed a `has_one` relationship "\
                                         " using the `belongs_to` class method. We think `has_one`" \
@@ -479,10 +490,10 @@ module JSONAPI
       # TODO: remove this after the createable_fields and updateable_fields are phased out
       # :nocov:
       def method_missing(method, *args)
-        if method.to_s.match /createable_fields/
+        if method.to_s.match(/createable_fields/)
           ActiveSupport::Deprecation.warn('`createable_fields` is deprecated, please use `creatable_fields` instead')
           creatable_fields(*args)
-        elsif method.to_s.match /updateable_fields/
+        elsif method.to_s.match(/updateable_fields/)
           ActiveSupport::Deprecation.warn('`updateable_fields` is deprecated, please use `updatable_fields` instead')
           updatable_fields(*args)
         else
@@ -912,7 +923,7 @@ module JSONAPI
                 @model.method(foreign_key).call
               end unless method_defined?(foreign_key)
 
-              define_method relationship_name do |options = {}|
+              define_method relationship_name do |opts = {}|
                 relationship = self.class._relationships[relationship_name]
 
                 if relationship.polymorphic?
@@ -936,7 +947,7 @@ module JSONAPI
                 record.public_send(relationship.resource_klass._primary_key)
               end unless method_defined?(foreign_key)
 
-              define_method relationship_name do |options = {}|
+              define_method relationship_name do |opts = {}|
                 relationship = self.class._relationships[relationship_name]
 
                 resource_klass = relationship.resource_klass
@@ -954,24 +965,24 @@ module JSONAPI
               end
             end unless method_defined?(foreign_key)
 
-            define_method relationship_name do |options = {}|
+            define_method relationship_name do |opts = {}|
               relationship = self.class._relationships[relationship_name]
 
               resource_klass = relationship.resource_klass
               records = public_send(associated_records_method_name)
 
-              filters = options.fetch(:filters, {})
+              filters = opts.fetch(:filters, {})
               unless filters.nil? || filters.empty?
                 records = resource_klass.apply_filters(records, filters, options)
               end
 
-              sort_criteria =  options.fetch(:sort_criteria, {})
+              sort_criteria =  opts.fetch(:sort_criteria, {})
               unless sort_criteria.nil? || sort_criteria.empty?
                 order_options = relationship.resource_klass.construct_order_options(sort_criteria)
                 records = resource_klass.apply_sort(records, order_options, @context)
               end
 
-              paginator = options[:paginator]
+              paginator = opts[:paginator]
               if paginator
                 records = resource_klass.apply_pagination(records, paginator, order_options)
               end
