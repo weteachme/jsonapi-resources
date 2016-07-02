@@ -345,22 +345,22 @@ module JSONAPI
 
       def resource_for(type, module_prefix = '')
 
-        type_only = type.split('/').last
+        type_with_module = type.include?('/') ? type : module_path + type
 
-        type_with_module = module_prefix + type_only
         resource_name = _resource_name_from_type(type_with_module)
-
         resource = resource_name.safe_constantize if resource_name
 
         if resource.nil?
+          type_only = type.split('/').last
 
-          type_with_module = type.include?('/') ? type : module_path + type
-
+          type_with_module = [module_prefix, type_only].join('/')
           resource_name = _resource_name_from_type(type_with_module)
+
           resource = resource_name.safe_constantize if resource_name
-        end
-        if resource.nil?
-          fail NameError, "JSONAPI: Could not find resource '#{type}'. (Class #{resource_name} not found)"
+
+          if resource.nil?
+            fail NameError, "JSONAPI: Could not find resource '#{type}'. (Class #{resource_name} not found)"
+          end
         end
         resource
       end
