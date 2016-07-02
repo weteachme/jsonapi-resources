@@ -856,7 +856,7 @@ module JSONAPI
 
         return @model if @model
         @model = _model_name.to_s.safe_constantize
-        warn "[MODEL NOT FOUND] Model could not be found for #{self.name}. If this a base Resource declare it as abstract." if @model.nil?
+        #warn "[MODEL NOT FOUND] Model could not be found for #{self.name}. If this a base Resource declare it as abstract." if @model.nil?
         @model
       end
 
