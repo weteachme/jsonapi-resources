@@ -353,10 +353,15 @@ module JSONAPI
         if resource.nil?
           type_only = type.split('/').last
 
-          type_with_module = [module_prefix, type_only].join('/')
-          resource_name = _resource_name_from_type(type_with_module)
+          while resource.nil?
+            type_with_module = [module_prefix.underscore, type_only].join('/')
+            resource_name = _resource_name_from_type(type_with_module)
 
-          resource = resource_name.safe_constantize if resource_name
+            resource = resource_name.safe_constantize if resource_name
+
+            module_prefix = module_prefix.safe_constantize.to_s.deconstantize
+            break if module_prefix.blank?
+          end
 
           if resource.nil?
             fail NameError, "JSONAPI: Could not find resource '#{type}'. (Class #{resource_name} not found)"

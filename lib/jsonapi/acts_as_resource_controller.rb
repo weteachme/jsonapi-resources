@@ -62,7 +62,7 @@ module JSONAPI
       @request = JSONAPI::RequestParser.new(params, context: context,
                                             key_formatter: key_formatter,
                                             server_error_callbacks: (self.class.server_error_callbacks || []),
-                                            modules: self.class.to_s.deconstantize.underscore)
+                                            modules: self.class.to_s.deconstantize)
       unless @request.errors.empty?
         render_errors(@request.errors)
       else

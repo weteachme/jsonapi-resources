@@ -140,13 +140,13 @@ class ResourceTest < ActiveSupport::TestCase
   end
 
   def test_resource_for_with_namespaced_paths_with_modules
-    assert_equal(JSONAPI::Resource.resource_for('my_module/only_one', 'v1/my_module'), V1::MyModule::OnlyOneResource)
-    assert_equal(PostResource.resource_for('my_module/only_one', 'v1/my_module'), V1::MyModule::OnlyOneResource)
-    assert_equal(MyModule::MyNamespacedResource.resource_for('my_module/only_one', 'v1/my_module'), V1::MyModule::OnlyOneResource)
+    assert_equal(JSONAPI::Resource.resource_for('my_module/only_one', 'V1::MyModule'), V1::MyModule::OnlyOneResource)
+    assert_equal(PostResource.resource_for('my_module/only_one', 'V1::MyModule'), V1::MyModule::OnlyOneResource)
+    assert_equal(MyModule::MyNamespacedResource.resource_for('my_module/only_one', 'V1::MyModule'), V1::MyModule::OnlyOneResource)
 
-    assert_equal(JSONAPI::Resource.resource_for('only_one', 'v1/my_module'), V1::MyModule::OnlyOneResource)
-    assert_equal(PostResource.resource_for('only_one', 'v1/my_module'), V1::MyModule::OnlyOneResource)
-    assert_equal(MyModule::MyNamespacedResource.resource_for('only_one', 'v1/my_module'), V1::MyModule::OnlyOneResource)
+    assert_equal(JSONAPI::Resource.resource_for('only_one', 'V1::MyModule'), V1::MyModule::OnlyOneResource)
+    assert_equal(PostResource.resource_for('only_one', 'V1::MyModule'), V1::MyModule::OnlyOneResource)
+    assert_equal(MyModule::MyNamespacedResource.resource_for('only_one', 'V1::MyModule'), V1::MyModule::OnlyOneResource)
   end
 
   def test_resource_for_resource_does_not_exist_at_root
