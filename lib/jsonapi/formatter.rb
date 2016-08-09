@@ -2,7 +2,7 @@ module JSONAPI
   class Formatter
     class << self
       def format(arg)
-        arg.to_s
+        arg.to_s.split('/').uniq.join('/')
       end
 
       def unformat(arg)
