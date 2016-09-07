@@ -23,7 +23,8 @@ module JSONAPI
     end
 
     def resource_klass
-      @resource_klass ||= @parent_resource.resource_for(@class_name)
+      module_prefix = @parent_resource.to_s.deconstantize
+      @resource_klass ||= @parent_resource.resource_for(@class_name, module_prefix)
     end
 
     def table_name

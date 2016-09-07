@@ -1,3 +1,6 @@
+require "codeclimate-test-reporter"
+CodeClimate::TestReporter.start
+
 require 'simplecov'
 
 # To run tests with coverage:
@@ -104,7 +107,7 @@ if Rails::VERSION::MAJOR < 5
       if args[2] && args[2][:params]
         args[2] = args[2][:params]
       end
-      super *args
+      super(*args)
     end
   end
   class ActionController::TestCase

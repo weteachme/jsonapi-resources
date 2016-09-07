@@ -210,11 +210,13 @@ module ActionDispatch
             options[:controller] ||= relationship.class_name.underscore.pluralize
           else
             related_resource = JSONAPI::Resource.resource_for(resource_type_with_module_prefix(relationship.class_name.underscore.pluralize))
-            options[:controller] ||= related_resource._type.to_s
+            #options[:controller] ||= related_resource._type.to_s
+            options[:controller] ||= DasherizedKeyFormatter.unformat(related_resource._type.to_s.split('/').last)
           end
 
           match "#{formatted_relationship_name}", controller: options[:controller],
-                                                  relationship: relationship.name, source: resource_type_with_module_prefix(source._type),
+                                                  relationship: relationship.name, source: source._type.to_s,
+                                                  #relationship: relationship.name, source: resource_type_with_module_prefix(source._type),
                                                   action: 'get_related_resource', via: [:get]
         end
 
@@ -227,10 +229,12 @@ module ActionDispatch
 
           formatted_relationship_name = format_route(relationship.name)
           related_resource = JSONAPI::Resource.resource_for(resource_type_with_module_prefix(relationship.class_name.underscore))
-          options[:controller] ||= related_resource._type.to_s
+          #options[:controller] ||= related_resource._type.to_s
+          options[:controller] ||= DasherizedKeyFormatter.unformat(related_resource._type.to_s.split('/').last)
 
           match "#{formatted_relationship_name}", controller: options[:controller],
-                                                  relationship: relationship.name, source: resource_type_with_module_prefix(source._type),
+                                                  relationship: relationship.name, source: source._type.to_s,
+                                                  #relationship: relationship.name, source: resource_type_with_module_prefix(source._type),
                                                   action: 'get_related_resources', via: [:get]
         end
 
@@ -248,7 +252,8 @@ module ActionDispatch
 
         def resource_type_with_module_prefix(resource = nil)
           resource_name = resource || @scope[:jsonapi_resource]
-          [@scope[:module], resource_name].compact.collect(&:to_s).join('/')
+          #[@scope[:module], resource_name].compact.collect(&:to_s).join('/')
+          JSONAPI::Formatter.format([@scope[:module], resource_name].compact.collect(&:to_s).join('/'))
         end
       end
     end

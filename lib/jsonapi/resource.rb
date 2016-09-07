@@ -422,13 +422,29 @@ module JSONAPI
         check_reserved_resource_name(subclass._type, subclass.name)
       end
 
-      def resource_for(type)
+      def resource_for(type, module_prefix = '')
+
         type_with_module = type.include?('/') ? type : module_path + type
 
         resource_name = _resource_name_from_type(type_with_module)
         resource = resource_name.safe_constantize if resource_name
+
         if resource.nil?
-          fail NameError, "JSONAPI: Could not find resource '#{type}'. (Class #{resource_name} not found)"
+          type_only = type.split('/').last
+
+          while resource.nil?
+            type_with_module = [module_prefix.underscore, type_only].join('/')
+            resource_name = _resource_name_from_type(type_with_module)
+
+            resource = resource_name.safe_constantize if resource_name
+
+            module_prefix = module_prefix.safe_constantize.to_s.deconstantize
+            break if module_prefix.blank?
+          end
+
+          if resource.nil?
+            fail NameError, "JSONAPI: Could not find resource '#{type}'. (Class #{resource_name} not found)"
+          end
         end
         resource
       end
@@ -560,10 +576,10 @@ module JSONAPI
       # TODO: remove this after the createable_fields and updateable_fields are phased out
       # :nocov:
       def method_missing(method, *args)
-        if method.to_s.match /createable_fields/
+        if method.to_s.match(/createable_fields/)
           ActiveSupport::Deprecation.warn('`createable_fields` is deprecated, please use `creatable_fields` instead')
           creatable_fields(*args)
-        elsif method.to_s.match /updateable_fields/
+        elsif method.to_s.match(/updateable_fields/)
           ActiveSupport::Deprecation.warn('`updateable_fields` is deprecated, please use `updatable_fields` instead')
           updatable_fields(*args)
         else
@@ -892,7 +908,7 @@ module JSONAPI
       end
 
       def _as_parent_key
-        @_as_parent_key ||= "#{_type.to_s.singularize}_id"
+        @_as_parent_key ||= "#{_type.to_s.split('/').last.singularize}_id"
       end
 
       def _allowed_filters
@@ -932,7 +948,7 @@ module JSONAPI
 
         return @model if @model
         @model = _model_name.to_s.safe_constantize
-        warn "[MODEL NOT FOUND] Model could not be found for #{self.name}. If this a base Resource declare it as abstract." if @model.nil?
+        #warn "[MODEL NOT FOUND] Model could not be found for #{self.name}. If this a base Resource declare it as abstract." if @model.nil?
         @model
       end
 
