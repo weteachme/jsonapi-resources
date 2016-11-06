@@ -1,6 +1,4 @@
 require "codeclimate-test-reporter"
-CodeClimate::TestReporter.start
-
 require 'simplecov'
 
 # To run tests with coverage:
@@ -67,6 +65,12 @@ end
 module MyEngine
   class Engine < ::Rails::Engine
     isolate_namespace MyEngine
+  end
+end
+
+module ApiV2Engine
+  class Engine < ::Rails::Engine
+    isolate_namespace ApiV2Engine
   end
 end
 
@@ -279,6 +283,8 @@ TestApp.routes.draw do
   jsonapi_resources :authors
 
   namespace :api do
+    jsonapi_resources :boxes
+
     namespace :v1 do
       jsonapi_resources :people
       jsonapi_resources :comments
@@ -390,6 +396,7 @@ TestApp.routes.draw do
   end
 
   mount MyEngine::Engine => "/boomshaka", as: :my_engine
+  mount ApiV2Engine::Engine => "/api_v2", as: :api_v2_engine
 end
 
 MyEngine::Engine.routes.draw do
@@ -410,6 +417,10 @@ MyEngine::Engine.routes.draw do
       jsonapi_resources :people
     end
   end
+end
+
+ApiV2Engine::Engine.routes.draw do
+  jsonapi_resources :people
 end
 
 # Ensure backward compatibility with Minitest 4
