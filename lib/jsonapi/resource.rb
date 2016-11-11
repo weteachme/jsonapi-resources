@@ -508,6 +508,9 @@ module JSONAPI
         end unless method_defined?(attr)
 
         define_method "#{attr}=" do |value|
+          if value.is_a?(ActionController::Parameters)
+            value = value.to_unsafe_h.deep_symbolize_keys
+          end
           @model.public_send("#{options[:delegate] ? options[:delegate].to_sym : attr}=", value)
         end unless method_defined?("#{attr}=")
       end
