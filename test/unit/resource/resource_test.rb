@@ -100,6 +100,14 @@ module MyAPI
   end
 end
 
+module V1
+  module MyModule
+    class OnlyOneResource < JSONAPI::Resource
+      model_name "Comment"
+    end
+  end
+end
+
 class PostWithReadonlyAttributesResource < JSONAPI::Resource
   model_name 'Post'
   attribute :title, readonly: true
