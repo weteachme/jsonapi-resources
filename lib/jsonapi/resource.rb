@@ -1016,9 +1016,9 @@ module JSONAPI
         return nil if model_name.to_s.blank?
 
         @model_class = model_name.to_s.safe_constantize
-        if @model_class.nil?
-          warn "[MODEL NOT FOUND] Model could not be found for #{self.name}. If this is a base Resource declare it as abstract."
-        end
+        #if @model_class.nil?
+        #  warn "[MODEL NOT FOUND] Model could not be found for #{self.name}. If this is a base Resource declare it as abstract."
+        #end
 
         @model_class
       end
