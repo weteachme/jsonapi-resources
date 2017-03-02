@@ -459,10 +459,8 @@ module JSONAPI
         resource = resource_name.safe_constantize if resource_name
 
         if resource.nil?
-          type_only = type.split('/').last
-
           while resource.nil?
-            type_with_module = [module_prefix.underscore, type_only].join('/')
+            type_with_module = [module_prefix.underscore, type].join('/')
             resource_name = _resource_name_from_type(type_with_module)
 
             resource = resource_name.safe_constantize if resource_name
