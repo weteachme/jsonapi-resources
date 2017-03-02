@@ -47,7 +47,9 @@ class NoMatchAbstractResource < JSONAPI::Resource
   abstract
 end
 
-class CatResource < JSONAPI::Resource
+class FelineResource < JSONAPI::Resource
+  model_name 'Cat'
+
   attribute :name
   attribute :breed
   attribute :kind, :delegate => :breed
@@ -98,12 +100,10 @@ module MyAPI
   end
 end
 
-module V1
-  module MyModule
-    class OnlyOneResource < JSONAPI::Resource
-      model_name "Comment"
-    end
-  end
+class PostWithReadonlyAttributesResource < JSONAPI::Resource
+  model_name 'Post'
+  attribute :title, readonly: true
+  has_one :author, readonly: true
 end
 
 class ResourceTest < ActiveSupport::TestCase
@@ -211,7 +211,7 @@ class ResourceTest < ActiveSupport::TestCase
   #end
 
   def test_nil_abstract_model_class
-    assert_output nil, '' do
+    assert_silent do
       assert_nil NoMatchAbstractResource._model_class
     end
   end
@@ -221,28 +221,36 @@ class ResourceTest < ActiveSupport::TestCase
   end
 
   def test_class_attributes
-    attrs = CatResource._attributes
+    attrs = FelineResource._attributes
     assert_kind_of(Hash, attrs)
     assert_equal(attrs.keys.size, 4)
   end
 
   def test_class_relationships
-    relationships = CatResource._relationships
+    relationships = FelineResource._relationships
     assert_kind_of(Hash, relationships)
     assert_equal(relationships.size, 2)
   end
 
+  def test_replace_polymorphic_to_one_link
+    picture_resource = PictureResource.find_by_key(Picture.first)
+    picture_resource.replace_polymorphic_to_one_link('imageable', '9', 'Topic')
+
+    assert Picture.first.imageable_id == 9
+    assert Picture.first.imageable_type == Document::Topic.to_s
+  end
+
   def test_duplicate_relationship_name
-    assert_output nil, "[DUPLICATE RELATIONSHIP] `mother` has already been defined in CatResource.\n" do
-      CatResource.instance_eval do
+    assert_output nil, "[DUPLICATE RELATIONSHIP] `mother` has already been defined in FelineResource.\n" do
+      FelineResource.instance_eval do
         has_one :mother, class_name: 'Cat'
       end
     end
   end
 
   def test_duplicate_attribute_name
-    assert_output nil, "[DUPLICATE ATTRIBUTE] `name` has already been defined in CatResource.\n" do
-      CatResource.instance_eval do
+    assert_output nil, "[DUPLICATE ATTRIBUTE] `name` has already been defined in FelineResource.\n" do
+      FelineResource.instance_eval do
         attribute :name
       end
     end
@@ -313,21 +321,7 @@ class ResourceTest < ActiveSupport::TestCase
   end
 
   def test_updatable_fields_does_not_include_id
-    assert(!CatResource.updatable_fields.include?(:id))
-  end
-
-  # TODO: Please remove after `updateable_fields` is removed
-  def test_updateable_fields_delegates_to_updatable_fields_with_deprecation
-    ActiveSupport::Deprecation.silence do
-      assert_empty(CatResource.updateable_fields(nil) - [:mother, :father, :name, :breed, :kind])
-    end
-  end
-
-  # TODO: Please remove after `createable_fields` is removed
-  def test_createable_fields_delegates_to_creatable_fields_with_deprecation
-    ActiveSupport::Deprecation.silence do
-      assert_empty(CatResource.createable_fields(nil) - [:mother, :father, :name, :breed, :id, :kind])
-    end
+    assert(!FelineResource.updatable_fields.include?(:id))
   end
 
   def test_filter_on_to_many_relationship_id
@@ -471,60 +465,60 @@ LEFT JOIN people AS author_sorting ON author_sorting.id = posts.author_id", resu
   end
 
   def test_key_type_integer
-    CatResource.instance_eval do
+    FelineResource.instance_eval do
       key_type :integer
     end
 
-    assert CatResource.verify_key('45')
-    assert CatResource.verify_key(45)
+    assert FelineResource.verify_key('45')
+    assert FelineResource.verify_key(45)
 
     assert_raises JSONAPI::Exceptions::InvalidFieldValue do
-      CatResource.verify_key('45,345')
+      FelineResource.verify_key('45,345')
     end
 
   ensure
-    CatResource.instance_eval do
+    FelineResource.instance_eval do
       key_type nil
     end
   end
 
   def test_key_type_string
-    CatResource.instance_eval do
+    FelineResource.instance_eval do
       key_type :string
     end
 
-    assert CatResource.verify_key('45')
-    assert CatResource.verify_key(45)
+    assert FelineResource.verify_key('45')
+    assert FelineResource.verify_key(45)
 
     assert_raises JSONAPI::Exceptions::InvalidFieldValue do
-      CatResource.verify_key('45,345')
+      FelineResource.verify_key('45,345')
     end
 
   ensure
-    CatResource.instance_eval do
+    FelineResource.instance_eval do
       key_type nil
     end
   end
 
   def test_key_type_uuid
-    CatResource.instance_eval do
+    FelineResource.instance_eval do
       key_type :uuid
     end
 
-    assert CatResource.verify_key('f1a4d5f2-e77a-4d0a-acbb-ee0b98b3f6b5')
+    assert FelineResource.verify_key('f1a4d5f2-e77a-4d0a-acbb-ee0b98b3f6b5')
 
     assert_raises JSONAPI::Exceptions::InvalidFieldValue do
-      CatResource.verify_key('f1a-e77a-4d0a-acbb-ee0b98b3f6b5')
+      FelineResource.verify_key('f1a-e77a-4d0a-acbb-ee0b98b3f6b5')
     end
 
   ensure
-    CatResource.instance_eval do
+    FelineResource.instance_eval do
       key_type nil
     end
   end
 
   def test_key_type_proc
-    CatResource.instance_eval do
+    FelineResource.instance_eval do
       key_type -> (key, context) {
         return key if key.nil?
         if key.to_s.match(/^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/)
@@ -535,14 +529,14 @@ LEFT JOIN people AS author_sorting ON author_sorting.id = posts.author_id", resu
       }
     end
 
-    assert CatResource.verify_key('f1a4d5f2-e77a-4d0a-acbb-ee0b98b3f6b5')
+    assert FelineResource.verify_key('f1a4d5f2-e77a-4d0a-acbb-ee0b98b3f6b5')
 
     assert_raises JSONAPI::Exceptions::InvalidFieldValue do
-      CatResource.verify_key('f1a-e77a-4d0a-acbb-ee0b98b3f6b5')
+      FelineResource.verify_key('f1a-e77a-4d0a-acbb-ee0b98b3f6b5')
     end
 
   ensure
-    CatResource.instance_eval do
+    FelineResource.instance_eval do
       key_type nil
     end
   end
@@ -606,7 +600,7 @@ LEFT JOIN people AS author_sorting ON author_sorting.id = posts.author_id", resu
           end
         CODE
       end
-      assert_match(/`#{key}` is a reserved relationship name in ./, err)
+      assert_match /`#{key}` is a reserved relationship name in ./, err
     end
   end
 
@@ -618,7 +612,7 @@ LEFT JOIN people AS author_sorting ON author_sorting.id = posts.author_id", resu
   #      NoModelResource._model_class
   #    CODE
   #  end
-  #  assert_match "[MODEL NOT FOUND] Model could not be found for ResourceTest::NoModelResource. If this a base Resource declare it as abstract.\n", err
+  #  assert_match "[MODEL NOT FOUND] Model could not be found for ResourceTest::NoModelResource. If this is a base Resource declare it as abstract.\n", err
   #end
 
   #def test_no_warning_when_abstract

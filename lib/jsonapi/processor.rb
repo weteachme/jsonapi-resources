@@ -11,9 +11,9 @@ module JSONAPI
                                        :replace_fields,
                                        :replace_to_one_relationship,
                                        :replace_polymorphic_to_one_relationship,
-                                       :create_to_many_relationship,
-                                       :replace_to_many_relationship,
-                                       :remove_to_many_relationship,
+                                       :create_to_many_relationships,
+                                       :replace_to_many_relationships,
+                                       :remove_to_many_relationships,
                                        :remove_to_one_relationship,
                                        :operation
 
@@ -71,12 +71,21 @@ module JSONAPI
       fields = params[:fields]
 
       verified_filters = resource_klass.verify_filters(filters, context)
-      resource_records = resource_klass.find(verified_filters,
-                                             context: context,
-                                             include_directives: include_directives,
-                                             sort_criteria: sort_criteria,
-                                             paginator: paginator,
-                                             fields: fields)
+      find_options = {
+        context: context,
+        include_directives: include_directives,
+        sort_criteria: sort_criteria,
+        paginator: paginator,
+        fields: fields
+      }
+
+      resource_records = if params[:cache_serializer]
+        resource_klass.find_serialized_with_caching(verified_filters,
+                                                    params[:cache_serializer],
+                                                    find_options)
+      else
+        resource_klass.find(verified_filters, find_options)
+      end
 
       page_options = {}
       if (JSONAPI.configuration.top_level_meta_include_record_count ||
@@ -87,7 +96,7 @@ module JSONAPI
       end
 
       if (JSONAPI.configuration.top_level_meta_include_page_count && page_options[:record_count])
-        page_options[:page_count] = paginator.calculate_page_count(page_options[:record_count])
+        page_options[:page_count] = paginator ? paginator.calculate_page_count(page_options[:record_count]) : 1
       end
 
       if JSONAPI.configuration.top_level_links_include_pagination && paginator
@@ -104,10 +113,19 @@ module JSONAPI
 
       key = resource_klass.verify_key(id, context)
 
-      resource_record = resource_klass.find_by_key(key,
-                                                   context: context,
-                                                   include_directives: include_directives,
-                                                   fields: fields)
+      find_options = {
+        context: context,
+        include_directives: include_directives,
+        fields: fields
+      }
+
+      resource_record = if params[:cache_serializer]
+        resource_klass.find_by_key_serialized_with_caching(key,
+                                                           params[:cache_serializer],
+                                                           find_options)
+      else
+        resource_klass.find_by_key(key, find_options)
+      end
 
       return JSONAPI::ResourceOperationResult.new(:ok, resource_record)
     end
@@ -129,6 +147,7 @@ module JSONAPI
       relationship_type = params[:relationship_type].to_sym
       fields = params[:fields]
 
+      # TODO Should fetch related_resource from cache if caching enabled
       source_resource = source_klass.find_by_key(source_id, context: context, fields: fields)
 
       related_resource = source_resource.public_send(relationship_type)
@@ -145,16 +164,34 @@ module JSONAPI
       sort_criteria = params[:sort_criteria]
       paginator = params[:paginator]
       fields = params[:fields]
+      include_directives = params[:include_directives]
 
       source_resource ||= source_klass.find_by_key(source_id, context: context, fields: fields)
 
-      related_resources = source_resource.public_send(relationship_type,
-                                                      context: context,
-                                                      filters: filters,
-                                                      include_directives: include_directives,
-                                                      sort_criteria: sort_criteria,
-                                                      paginator: paginator,
-                                                      fields: fields)
+      rel_opts = {
+        filters:  filters,
+        sort_criteria: sort_criteria,
+        paginator: paginator,
+        fields: fields,
+        context: context,
+        include_directives: include_directives
+      }
+
+      related_resources = nil
+      if params[:cache_serializer]
+        # TODO Could also avoid instantiating source_resource as actual Resource by
+        # allowing LinkBuilder to accept CachedResourceFragment as source in
+        # relationships_related_link
+        scope = source_resource.public_send(:"records_for_#{relationship_type}", rel_opts)
+        relationship = source_klass._relationship(relationship_type)
+        related_resources = relationship.resource_klass.find_serialized_with_caching(
+          scope,
+          params[:cache_serializer],
+          rel_opts
+        )
+      else
+        related_resources = source_resource.public_send(relationship_type, rel_opts)
+      end
 
       if ((JSONAPI.configuration.top_level_meta_include_record_count) ||
           (paginator && paginator.class.requires_record_count) ||
@@ -240,7 +277,7 @@ module JSONAPI
       return JSONAPI::OperationResult.new(result == :completed ? :no_content : :accepted)
     end
 
-    def create_to_many_relationship
+    def create_to_many_relationships
       resource_id = params[:resource_id]
       relationship_type = params[:relationship_type].to_sym
       data = params[:data]
@@ -251,7 +288,7 @@ module JSONAPI
       return JSONAPI::OperationResult.new(result == :completed ? :no_content : :accepted)
     end
 
-    def replace_to_many_relationship
+    def replace_to_many_relationships
       resource_id = params[:resource_id]
       relationship_type = params[:relationship_type].to_sym
       data = params.fetch(:data)
@@ -262,15 +299,21 @@ module JSONAPI
       return JSONAPI::OperationResult.new(result == :completed ? :no_content : :accepted)
     end
 
-    def remove_to_many_relationship
+    def remove_to_many_relationships
       resource_id = params[:resource_id]
       relationship_type = params[:relationship_type].to_sym
-      associated_key = params[:associated_key]
+      associated_keys = params[:associated_keys]
 
       resource = resource_klass.find_by_key(resource_id, context: context)
-      result = resource.remove_to_many_link(relationship_type, associated_key)
 
-      return JSONAPI::OperationResult.new(result == :completed ? :no_content : :accepted)
+      complete = true
+      associated_keys.each do |key|
+        result = resource.remove_to_many_link(relationship_type, key)
+        if complete && result != :completed
+          complete = false
+        end
+      end
+      return JSONAPI::OperationResult.new(complete ? :no_content : :accepted)
     end
 
     def remove_to_one_relationship

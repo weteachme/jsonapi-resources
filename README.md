@@ -2,58 +2,18 @@
 
 [![Join the chat at https://gitter.im/cerebris/jsonapi-resources](https://badges.gitter.im/Join%20Chat.svg)](https://gitter.im/cerebris/jsonapi-resources?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge)
 
-**NOTE:** This README is the documentation for `JSONAPI::Resources`. If you are viewing this at the
-[project page on Github](https://github.com/cerebris/jsonapi-resources) you are viewing the documentation for the `master`
-branch. This may contain information that is not relevant to the release you are using. Please see the README for the
-[version](https://github.com/cerebris/jsonapi-resources/releases) you are using.
+`JSONAPI::Resources`, or "JR", provides a framework for developing an API server that complies with the
+[JSON:API](http://jsonapi.org/) specification.
 
- ---
-
-`JSONAPI::Resources`, or "JR", provides a framework for developing a server that complies with the
-[JSON API](http://jsonapi.org/) specification.
-
-Like JSON API itself, JR's design is focused on the resources served by an API. JR needs little more than a definition
+Like JSON:API itself, JR's design is focused on the resources served by an API. JR needs little more than a definition
 of your resources, including their attributes and relationships, to make your server compliant with JSON API.
 
-JR is designed to work with Rails 4.0+, and provides custom routes, controllers, and serializers. JR's resources may be
+JR is designed to work with Rails 4.2+, and provides custom routes, controllers, and serializers. JR's resources may be
 backed by ActiveRecord models or by custom objects.
 
-## Table of Contents
+## Documentation
 
-* [Demo App] (#demo-app)
-* [Client Libraries] (#client-libraries)
-* [Installation] (#installation)
-* [Usage] (#usage)
-  * [Resources] (#resources)
-    * [JSONAPI::Resource] (#jsonapiresource)
-    * [Context] (#context)
-    * [Attributes] (#attributes)
-    * [Primary Key] (#primary-key)
-    * [Model Name] (#model-name)
-    * [Model Hints] (#model-hints)
-    * [Relationships] (#relationships)
-    * [Filters] (#filters)
-    * [Pagination] (#pagination)
-    * [Included relationships (side-loading resources)] (#included-relationships-side-loading-resources)
-    * [Resource meta] (#resource-meta)
-    * [Custom Links] (#custom-links)
-    * [Callbacks] (#callbacks)
-  * [Controllers] (#controllers)
-    * [Namespaces] (#namespaces)
-    * [Error Codes] (#error-codes)
-    * [Handling Exceptions] (#handling-exceptions)
-    * [Action Callbacks] (#action-callbacks)
-  * [Operation Processors] (#operation-processors)
-  * [Serializer] (#serializer)
-    * [Serializer options] (#serializer-options)
-    * [Formatting] (#formatting)
-    * [Key Format] (#key-format)
-  * [Routing] (#routing)
-    * [Nested Routes] (#nested-routes)
-  * [Authorization](#authorization)
-* [Configuration] (#configuration)
-* [Contributing] (#contributing)
-* [License] (#license)
+Full documentation can be found at [http://jsonapi-resources.com](http://jsonapi-resources.com), including the [v0.9 beta Guide](http://jsonapi-resources.com/v0.9/guide/) specific to this version. 
 
 ## Demo App
 
@@ -61,8 +21,8 @@ We have a simple demo app, called [Peeps](https://github.com/cerebris/peeps), av
 
 ## Client Libraries
 
-JSON API maintains a (non-verified) listing of [client libraries](http://jsonapi.org/implementations/#client-libraries)
-which *should* be compatible with JSON API compliant server implementations such as JR.
+JSON:API maintains a (non-verified) listing of [client libraries](http://jsonapi.org/implementations/#client-libraries)
+which *should* be compatible with JSON:API compliant server implementations such as JR.
 
 ## Installation
 
@@ -1986,6 +1946,7 @@ JSONAPI.configure do |config|
   config.cache_formatters = true
 end
 ```
+**For further usage see the [v0.9 Guide](http://jsonapi-resources.com/v0.9/guide/)**
 
 ## Contributing
 

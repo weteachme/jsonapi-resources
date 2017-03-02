@@ -2,14 +2,12 @@ require 'csv'
 
 module JSONAPI
   module ActsAsResourceController
-    MEDIA_TYPE_MATCHER = /(.+".+"[^,]*|[^,]+)/
+    MEDIA_TYPE_MATCHER = /.+".+"[^,]*|[^,]+/
     ALL_MEDIA_TYPES = '*/*'
 
     def self.included(base)
       base.extend ClassMethods
       base.include Callbacks
-      base.before_action :ensure_correct_media_type, only: [:create, :update, :create_relationship, :update_relationship]
-      base.before_action :ensure_valid_accept_media_type
       base.cattr_reader :server_error_callbacks
       base.define_jsonapi_resources_callbacks :process_operations
     end
@@ -27,18 +25,22 @@ module JSONAPI
     end
 
     def create
+      return unless verify_content_type_header
       process_request
     end
 
     def create_relationship
+      return unless verify_content_type_header
       process_request
     end
 
     def update_relationship
+      return unless verify_content_type_header
       process_request
     end
 
     def update
+      return unless verify_content_type_header
       process_request
     end
 
@@ -59,6 +61,8 @@ module JSONAPI
     end
 
     def process_request
+      return unless verify_accept_header
+
       @request = JSONAPI::RequestParser.new(params, context: context,
                                             key_formatter: key_formatter,
                                             server_error_callbacks: (self.class.server_error_callbacks || []),
@@ -66,17 +70,20 @@ module JSONAPI
       unless @request.errors.empty?
         render_errors(@request.errors)
       else
-        process_operations
-        render_results(@operation_results)
+        operations = @request.operations
+        unless JSONAPI.configuration.resource_cache.nil?
+          operations.each {|op| op.options[:cache_serializer] = resource_serializer }
+        end
+        results = process_operations(operations)
+        render_results(results)
       end
-
     rescue => e
       handle_exceptions(e)
     end
 
-    def process_operations
+    def process_operations(operations)
       run_callbacks :process_operations do
-        @operation_results = operation_dispatcher.process(@request.operations)
+        operation_dispatcher.process(operations)
       end
     end
 
@@ -110,6 +117,19 @@ module JSONAPI
       @resource_serializer_klass ||= JSONAPI::ResourceSerializer
     end
 
+    def resource_serializer
+      @resource_serializer ||= resource_serializer_klass.new(
+        resource_klass,
+        include_directives: @request ? @request.include_directives : nil,
+        fields: @request ? @request.fields : {},
+        base_url: base_url,
+        key_formatter: key_formatter,
+        route_formatter: route_formatter,
+        serialization_options: serialization_options
+      )
+      @resource_serializer
+    end
+
     def base_url
       @base_url ||= request.protocol + request.host_with_port
     end
@@ -118,34 +138,38 @@ module JSONAPI
       @resource_klass_name ||= "#{self.class.name.underscore.sub(/_controller$/, '').singularize}_resource".camelize
     end
 
-    def ensure_correct_media_type
+    def verify_content_type_header
       unless request.content_type == JSONAPI::MEDIA_TYPE
         fail JSONAPI::Exceptions::UnsupportedMediaTypeError.new(request.content_type)
       end
+      true
     rescue => e
       handle_exceptions(e)
+      false
     end
 
-    def ensure_valid_accept_media_type
+    def verify_accept_header
       unless valid_accept_media_type?
         fail JSONAPI::Exceptions::NotAcceptableError.new(request.accept)
       end
+      true
     rescue => e
       handle_exceptions(e)
+      false
     end
 
     def valid_accept_media_type?
       media_types = media_types_for('Accept')
 
       media_types.blank? ||
-          media_types.any? do |media_type|
-            (media_type == JSONAPI::MEDIA_TYPE || media_type == ALL_MEDIA_TYPES)
-          end
+        media_types.any? do |media_type|
+          (media_type == JSONAPI::MEDIA_TYPE || media_type.start_with?(ALL_MEDIA_TYPES))
+        end
     end
 
     def media_types_for(header)
       (request.headers[header] || '')
-        .match(MEDIA_TYPE_MATCHER)
+        .scan(MEDIA_TYPE_MATCHER)
         .to_a
         .map(&:strip)
     end
@@ -199,16 +223,24 @@ module JSONAPI
 
     def render_results(operation_results)
       response_doc = create_response_document(operation_results)
+      content = response_doc.contents
 
-      render_options = {
-        status: response_doc.status,
-        json:   response_doc.contents,
-        content_type: JSONAPI::MEDIA_TYPE
-      }
+      render_options = {}
+      if operation_results.has_errors?
+        render_options[:json] = content
+      else
+        # Bypasing ActiveSupport allows us to use CompiledJson objects for cached response fragments
+        render_options[:body] = JSON.generate(content)
+      end
 
-      render_options[:location] = response_doc.contents[:data]["links"][:self] if (
-        response_doc.status == :created && response_doc.contents[:data].class != Array
+      render_options[:location] = content[:data]["links"][:self] if (
+        response_doc.status == :created && content[:data].class != Array
       )
+
+      # For whatever reason, `render` ignores :status and :content_type when :body is set.
+      # But, we can just set those values directly in the Response object instead.
+      response.status = response_doc.status
+      response.headers['Content-Type'] = JSONAPI::MEDIA_TYPE
 
       render(render_options)
     end
@@ -216,17 +248,11 @@ module JSONAPI
     def create_response_document(operation_results)
       JSONAPI::ResponseDocument.new(
         operation_results,
-        primary_resource_klass: resource_klass,
-        include_directives: @request ? @request.include_directives : nil,
-        fields: @request ? @request.fields : nil,
-        base_url: base_url,
+        operation_results.has_errors? ? nil : resource_serializer,
         key_formatter: key_formatter,
-        route_formatter: route_formatter,
         base_meta: base_meta,
         base_links: base_response_links,
-        resource_serializer_klass: resource_serializer_klass,
-        request: @request,
-        serialization_options: serialization_options
+        request: @request
       )
     end
 
@@ -240,10 +266,24 @@ module JSONAPI
         if JSONAPI.configuration.exception_class_whitelisted?(e)
           fail e
         else
+          (self.class.server_error_callbacks || []).each { |callback|
+            safe_run_callback(callback, e)
+          }
+
           internal_server_error = JSONAPI::Exceptions::InternalServerError.new(e)
           Rails.logger.error { "Internal Server Error: #{e.message} #{e.backtrace.join("\n")}" }
           render_errors(internal_server_error.errors)
         end
+      end
+    end
+
+    def safe_run_callback(callback, error)
+      begin
+        callback.call(error)
+      rescue => e
+        Rails.logger.error { "Error in error handling callback: #{e.message} #{e.backtrace.join("\n")}" }
+        internal_server_error = JSONAPI::Exceptions::InternalServerError.new(e)
+        render_errors(internal_server_error.errors)
       end
     end
 

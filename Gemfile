@@ -8,18 +8,14 @@ platforms :ruby do
   gem "codeclimate-test-reporter", group: :test, require: nil
 end
 
-platforms :jruby do
-  gem 'activerecord-jdbcsqlite3-adapter'
-end
-
 version = ENV['RAILS_VERSION'] || 'default'
 
 case version
 when 'master'
-  gem 'rails', { git: 'https://github.com/rails/rails.git' }
+  gem 'railties', { git: 'https://github.com/rails/rails.git' }
   gem 'arel', { git: 'https://github.com/rails/arel.git' }
 when 'default'
-  gem 'rails', '>= 4.2'
+  gem 'railties', '>= 5.0'
 else
-  gem 'rails', "~> #{version}"
+  gem 'railties', "~> #{version}"
 end

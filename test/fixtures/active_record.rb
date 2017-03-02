@@ -49,10 +49,12 @@ ActiveRecord::Schema.define do
 
   create_table :tags, force: true do |t|
     t.string :name
+    t.timestamps null: false
   end
 
   create_table :sections, force: true do |t|
     t.string :name
+    t.timestamps null: false
   end
 
   create_table :posts_tags, force: true do |t|
@@ -83,6 +85,7 @@ ActiveRecord::Schema.define do
     t.integer :employee_id, null: false
     t.decimal :cost, precision: 12, scale: 4, null: false
     t.date :transaction_date
+    t.timestamps null: false
   end
 
   create_table :planets, force: true do |t|
@@ -104,17 +107,20 @@ ActiveRecord::Schema.define do
     t.string  :name
     t.string  :description
     t.integer :planet_id
+    t.timestamps null: false
   end
 
   create_table :craters, id: false, force: true do |t|
     t.string  :code
     t.string  :description
     t.integer :moon_id
+    t.timestamps null: false
   end
 
   create_table :preferences, force: true do |t|
     t.integer :person_id
     t.boolean :advanced_mode, default: false
+    t.timestamps null: false
   end
 
   create_table :facts, force: true do |t|
@@ -128,12 +134,14 @@ ActiveRecord::Schema.define do
     t.time     :bedtime
     t.binary   :photo, limit: 1.kilobyte
     t.boolean  :cool
+    t.timestamps null: false
   end
 
   create_table :books, force: true do |t|
     t.string :title
     t.string :isbn
     t.boolean :banned, default: false
+    t.timestamps null: false
   end
 
   create_table :book_authors, force: true do |t|
@@ -151,6 +159,7 @@ ActiveRecord::Schema.define do
 
   create_table :customers, force: true do |t|
     t.string   :name
+    t.timestamps null: false
   end
 
   create_table :purchase_orders, force: true do |t|
@@ -199,6 +208,7 @@ ActiveRecord::Schema.define do
   create_table :categories, force: true do |t|
     t.string :name
     t.string :status, limit: 10
+    t.timestamps null: false
   end
 
   create_table :pictures, force: true do |t|
@@ -226,27 +236,33 @@ ActiveRecord::Schema.define do
     t.string :drive_layout
     t.string :serial_number
     t.integer :person_id
+    t.timestamps null: false
   end
 
   create_table :makes, force: true do |t|
     t.string :model
+    t.timestamps null: false
   end
 
   # special cases - fields that look like they should be reserved names
   create_table :hrefs, force: true do |t|
     t.string :name
+    t.timestamps null: false
   end
 
   create_table :links, force: true do |t|
     t.string :name
+    t.timestamps null: false
   end
 
   create_table :web_pages, force: true do |t|
     t.string :href
     t.string :link
+    t.timestamps null: false
   end
 
   create_table :questionables, force: true do |t|
+    t.timestamps null: false
   end
 
   create_table :boxes, force: true  do |t|
@@ -273,6 +289,25 @@ ActiveRecord::Schema.define do
     t.references :to, references: :thing
 
     t.timestamps null: false
+  end
+
+  create_table :questions, force: true do |t|
+    t.string :text
+  end
+
+  create_table :answers, force: true do |t|
+    t.references :question
+    t.integer :respondent_id
+    t.string  :respondent_type
+    t.string :text
+  end
+
+  create_table :patients, force: true do |t|
+    t.string :name
+  end
+
+  create_table :doctors, force: true do |t|
+    t.string :name
   end
 
   # special cases
@@ -355,6 +390,7 @@ class Tag < ActiveRecord::Base
 end
 
 class Section < ActiveRecord::Base
+  has_many :posts
 end
 
 class HairCut < ActiveRecord::Base
@@ -401,7 +437,7 @@ class Planet < ActiveRecord::Base
         return false
       end
       # :nocov:
-   end
+    end
   end
 end
 
@@ -555,6 +591,9 @@ class Document < ActiveRecord::Base
   has_many :pictures, as: :imageable
 end
 
+class Document::Topic < Document
+end
+
 class Product < ActiveRecord::Base
   has_one :picture, as: :imageable
 end
@@ -586,6 +625,25 @@ class RelatedThing < ActiveRecord::Base
   belongs_to :to, class_name: Thing, foreign_key: :to_id
 end
 
+class Question < ActiveRecord::Base
+  has_one :answer
+
+  def respondent
+    answer.try(:respondent)
+  end
+end
+
+class Answer < ActiveRecord::Base
+  belongs_to :question
+  belongs_to :respondent, polymorphic: true
+end
+
+class Patient < ActiveRecord::Base
+end
+
+class Doctor < ActiveRecord::Base
+end
+
 module Api
   module V7
     class Client < Customer
@@ -611,6 +669,7 @@ class PostsController < BaseController
 
   class SpecialError < StandardError; end
   class SubSpecialError < PostsController::SpecialError; end
+  class SerializeError < StandardError; end
 
   # This is used to test that classes that are whitelisted are reraised by
   # the operations dispatcher.
@@ -630,6 +689,20 @@ class PostsController < BaseController
   #called by test_on_server_error
   def self.set_callback_message(error)
     @callback_message = "Sent from method"
+  end
+
+  def resource_serializer_klass
+    PostSerializer
+  end
+end
+
+class PostSerializer < JSONAPI::ResourceSerializer
+  def initialize(*)
+    if $PostSerializerRaisesErrors
+      raise PostsController::SerializeError
+    else
+      super
+    end
   end
 end
 
@@ -682,6 +755,9 @@ class BoatsController < JSONAPI::ResourceController
 end
 
 class BooksController < JSONAPI::ResourceController
+  def context
+    { title: 'Title' }
+  end
 end
 
 ### CONTROLLERS
@@ -800,6 +876,12 @@ module Api
   end
 
   module V6
+    class PostsController < JSONAPI::ResourceController
+    end
+
+    class SectionsController < JSONAPI::ResourceController
+    end
+
     class CustomersController < JSONAPI::ResourceController
     end
 
@@ -845,6 +927,21 @@ end
 module Api
   class BoxesController < JSONAPI::ResourceController
   end
+end
+
+class QuestionsController < JSONAPI::ResourceController
+end
+
+class AnswersController < JSONAPI::ResourceController
+end
+
+class PatientsController < JSONAPI::ResourceController
+end
+
+class DoctorsController < JSONAPI::ResourceController
+end
+
+class RespondentController < JSONAPI::ResourceController
 end
 
 ### RESOURCES
@@ -926,6 +1023,7 @@ class CompanyResource < JSONAPI::Resource
 end
 
 class FirmResource < CompanyResource
+  model_name "Firm"
 end
 
 class TagResource < JSONAPI::Resource
@@ -1031,7 +1129,7 @@ class PostResource < JSONAPI::Resource
   end
 
   def self.creatable_fields(context)
-    super(context) - [:subject, :id]
+    super(context) - [:subject]
   end
 
   def self.sortable_fields(context)
@@ -1052,6 +1150,10 @@ end
 
 class IsoCurrencyResource < JSONAPI::Resource
   attributes :name, :country_name, :minor_unit
+
+  def self.creatable_fields(_context = nil)
+    super + [:id]
+  end
 
   filter :country_name
 
@@ -1103,10 +1205,6 @@ class PlanetResource < JSONAPI::Resource
   has_one :planet_type
 
   has_many :tags, acts_as_set: true
-
-  def records_for_moons
-    Moon.joins(:craters).select('moons.*, craters.code').distinct
-  end
 end
 
 class PropertyResource < JSONAPI::Resource
@@ -1149,8 +1247,8 @@ class PreferencesResource < JSONAPI::Resource
 
   has_one :author, :foreign_key_on => :related
 
-  def self.find_by_key(key, options = {})
-    new(Preferences.first, nil)
+  def self.find_records(filters, options = {})
+    Preferences.limit(1)
   end
 end
 
@@ -1177,6 +1275,11 @@ end
 
 class DocumentResource < JSONAPI::Resource
   attribute :name
+  has_many :pictures
+end
+
+class TopicResource < JSONAPI::Resource
+  model_name 'Document::Topic'
   has_many :pictures
 end
 
@@ -1209,7 +1312,13 @@ class AuthorResource < JSONAPI::Resource
 end
 
 class BookResource < JSONAPI::Resource
+  attribute :title
+
   has_many :authors, class_name: 'Author', inverse_relationship: :books
+
+  def title
+    context[:title]
+  end
 end
 
 class AuthorDetailResource < JSONAPI::Resource
@@ -1360,6 +1469,8 @@ module Api
       attribute :title
       attributes :isbn, :banned
 
+      has_many :authors
+
       has_many :book_comments, relation_name: -> (options = {}) {
         context = options[:context]
         current_user = context ? context[:current_user] : nil
@@ -1478,24 +1589,16 @@ module Api
 
       filter :name
 
-      def self.find_by_key(key, options = {})
-        context = options[:context]
-        records = records(options)
-        records = apply_includes(records, options)
-        model = records.where({_primary_key => key}).first
-        fail JSONAPI::Exceptions::RecordNotFound.new(key) if model.nil?
-        self.new(model, context)
-      end
-
-      def self.find(filters, options = {})
-        resources = []
-
+      def self.find_records(filters, options = {})
+        rel = _model_class
         filters.each do |attr, filter|
-          _model_class.where("\"#{attr}\" LIKE \"%#{filter[0]}%\"").each do |model|
-            resources.push self.new(model, options[:context])
+          if attr.to_s == "id"
+            rel = rel.where(id: filter)
+          else
+            rel = rel.where("\"#{attr}\" LIKE \"%#{filter[0]}%\"")
           end
         end
-        return resources
+        rel
       end
 
       def fetchable_fields
@@ -1520,6 +1623,22 @@ end
 
 module Api
   module V6
+    class PersonResource < PersonResource; end
+    class TagResource < TagResource; end
+
+    class SectionResource < SectionResource
+      has_many :posts
+    end
+
+    class CommentResource < CommentResource; end
+
+    class PostResource < PostResource
+      # Test caching with SQL fragments
+      def self.records(options = {})
+        super.joins('INNER JOIN people on people.id = author_id')
+      end
+    end
+
     class CustomerResource < JSONAPI::Resource
       attribute :name
 
@@ -1741,6 +1860,30 @@ module Api
   class UserResource < JSONAPI::Resource
     has_many :things
   end
+end
+
+class QuestionResource < JSONAPI::Resource
+  has_one :answer
+  has_one :respondent, polymorphic: true, class_name: "Respondent", foreign_key_on: :related
+
+  attributes :text
+end
+
+class AnswerResource < JSONAPI::Resource
+  has_one :question
+  has_one :respondent, polymorphic: true
+end
+
+class PatientResource < JSONAPI::Resource
+  attributes :name
+end
+
+class DoctorResource < JSONAPI::Resource
+  attributes :name
+end
+
+class RespondentResource < JSONAPI::Resource
+  abstract
 end
 
 ### PORO Data - don't do this in a production app
