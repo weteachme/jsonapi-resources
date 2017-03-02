@@ -291,6 +291,25 @@ ActiveRecord::Schema.define do
     t.timestamps null: false
   end
 
+  create_table :questions, force: true do |t|
+    t.string :text
+  end
+
+  create_table :answers, force: true do |t|
+    t.references :question
+    t.integer :respondent_id
+    t.string  :respondent_type
+    t.string :text
+  end
+
+  create_table :patients, force: true do |t|
+    t.string :name
+  end
+
+  create_table :doctors, force: true do |t|
+    t.string :name
+  end
+
   # special cases
 end
 
@@ -606,6 +625,25 @@ class RelatedThing < ActiveRecord::Base
   belongs_to :to, class_name: Thing, foreign_key: :to_id
 end
 
+class Question < ActiveRecord::Base
+  has_one :answer
+
+  def respondent
+    answer.try(:respondent)
+  end
+end
+
+class Answer < ActiveRecord::Base
+  belongs_to :question
+  belongs_to :respondent, polymorphic: true
+end
+
+class Patient < ActiveRecord::Base
+end
+
+class Doctor < ActiveRecord::Base
+end
+
 module Api
   module V7
     class Client < Customer
@@ -717,6 +755,9 @@ class BoatsController < JSONAPI::ResourceController
 end
 
 class BooksController < JSONAPI::ResourceController
+  def context
+    { title: 'Title' }
+  end
 end
 
 ### CONTROLLERS
@@ -879,6 +920,21 @@ module Api
   end
 end
 
+class QuestionsController < JSONAPI::ResourceController
+end
+
+class AnswersController < JSONAPI::ResourceController
+end
+
+class PatientsController < JSONAPI::ResourceController
+end
+
+class DoctorsController < JSONAPI::ResourceController
+end
+
+class RespondentController < JSONAPI::ResourceController
+end
+
 ### RESOURCES
 class BaseResource < JSONAPI::Resource
   abstract
@@ -958,6 +1014,7 @@ class CompanyResource < JSONAPI::Resource
 end
 
 class FirmResource < CompanyResource
+  model_name "Firm"
 end
 
 class TagResource < JSONAPI::Resource
@@ -1063,7 +1120,7 @@ class PostResource < JSONAPI::Resource
   end
 
   def self.creatable_fields(context)
-    super(context) - [:subject, :id]
+    super(context) - [:subject]
   end
 
   def self.sortable_fields(context)
@@ -1084,6 +1141,10 @@ end
 
 class IsoCurrencyResource < JSONAPI::Resource
   attributes :name, :country_name, :minor_unit
+
+  def self.creatable_fields(_context = nil)
+    super + [:id]
+  end
 
   filter :country_name
 
@@ -1135,10 +1196,6 @@ class PlanetResource < JSONAPI::Resource
   has_one :planet_type
 
   has_many :tags, acts_as_set: true
-
-  def records_for_moons(opts = {})
-    Moon.joins(:craters).select('moons.*, craters.code').distinct
-  end
 end
 
 class PropertyResource < JSONAPI::Resource
@@ -1246,7 +1303,13 @@ class AuthorResource < JSONAPI::Resource
 end
 
 class BookResource < JSONAPI::Resource
+  attribute :title
+
   has_many :authors, class_name: 'Author', inverse_relationship: :books
+
+  def title
+    context[:title]
+  end
 end
 
 class AuthorDetailResource < JSONAPI::Resource
@@ -1788,6 +1851,30 @@ module Api
   class UserResource < JSONAPI::Resource
     has_many :things
   end
+end
+
+class QuestionResource < JSONAPI::Resource
+  has_one :answer
+  has_one :respondent, polymorphic: true, class_name: "Respondent", foreign_key_on: :related
+
+  attributes :text
+end
+
+class AnswerResource < JSONAPI::Resource
+  has_one :question
+  has_one :respondent, polymorphic: true
+end
+
+class PatientResource < JSONAPI::Resource
+  attributes :name
+end
+
+class DoctorResource < JSONAPI::Resource
+  attributes :name
+end
+
+class RespondentResource < JSONAPI::Resource
+  abstract
 end
 
 ### PORO Data - don't do this in a production app

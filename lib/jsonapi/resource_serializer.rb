@@ -50,15 +50,35 @@ module JSONAPI
 
       @included_objects = {}
 
-      process_primary(source, @include_directives.include_directives)
+      process_source_objects(source, @include_directives.include_directives)
+
+      primary_objects = []
+
+      # pull the processed objects corresponding to the source objects. Ensures we preserve order.
+      if is_resource_collection
+        source.each do |primary|
+          if primary.id
+            case primary
+              when CachedResourceFragment then primary_objects.push(@included_objects[primary.type][primary.id][:object_hash])
+              when Resource then primary_objects.push(@included_objects[primary.class._type][primary.id][:object_hash])
+              else raise "Unknown source type #{primary.inspect}"
+            end
+          end
+        end
+      else
+        if source.try(:id)
+          case source
+            when CachedResourceFragment then primary_objects.push(@included_objects[source.type][source.id][:object_hash])
+            when Resource then primary_objects.push(@included_objects[source.class._type][source.id][:object_hash])
+            else raise "Unknown source type #{source.inspect}"
+          end
+        end
+      end
 
       included_objects = []
-      primary_objects = []
       @included_objects.each_value do |objects|
         objects.each_value do |object|
-          if object[:primary]
-            primary_objects.push(object[:object_hash])
-          else
+          unless object[:primary]
             included_objects.push(object[:object_hash])
           end
         end
@@ -168,9 +188,9 @@ module JSONAPI
     # requested includes. Fields are controlled fields option for each resource type, such
     # as fields: { people: [:id, :email, :comments], posts: [:id, :title, :author], comments: [:id, :body, :post]}
     # The fields options controls both fields and included links references.
-    def process_primary(source, include_directives)
+    def process_source_objects(source, include_directives)
       if source.respond_to?(:to_ary)
-        source.each { |resource| process_primary(resource, include_directives) }
+        source.each { |resource| process_source_objects(resource, include_directives) }
       else
         return {} if source.nil?
         add_resource(source, include_directives, true)
@@ -298,8 +318,11 @@ module JSONAPI
       h = source.relationships || {}
       return h unless include_directives.has_key?(:include_related)
 
-      relationships = source.resource_klass._relationships.select{|k,v| source.fetchable_fields.include?(k) }
+      relationships = source.resource_klass._relationships.select do |k,v|
+        source.fetchable_fields.include?(k)
+      end
 
+      real_res = nil
       relationships.each do |rel_name, relationship|
         key = @key_formatter.format(rel_name)
         to_many = relationship.is_a? JSONAPI::Relationship::ToMany
@@ -310,7 +333,17 @@ module JSONAPI
             h[key][:data] = to_many ? [] : nil
           end
 
-          source.preloaded_fragments[key].each do |id, f|
+          fragments = source.preloaded_fragments[key]
+          if fragments.nil?
+            # The resources we want were not preloaded, we'll have to bypass the cache.
+            # This happens when including through belongs_to polymorphic relationships
+            if real_res.nil?
+              real_res = source.to_real_resource
+            end
+            relation_resources = [real_res.public_send(rel_name)].flatten(1).compact
+            fragments = relation_resources.map{|r| [r.id, r]}.to_h
+          end
+          fragments.each do |id, f|
             add_resource(f, ia)
 
             if h.has_key?(key)

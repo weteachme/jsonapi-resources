@@ -416,26 +416,39 @@ module JSONAPI
         subclass.immutable(false)
         subclass.caching(false)
         subclass._attributes = (_attributes || {}).dup
+
         subclass._model_hints = (_model_hints || {}).dup
 
-        subclass._relationships = {}
-        # Add the relationships from the base class to the subclass using the original options
-        if _relationships.is_a?(Hash)
-          _relationships.each_value do |relationship|
-            options = relationship.options.dup
-            options[:parent_resource] = subclass
-            subclass._add_relationship(relationship.class, relationship.name, options)
-          end
+        unless _model_name.empty?
+          subclass.model_name(_model_name, add_model_hint: (_model_hints && !_model_hints[_model_name].nil?) == true)
         end
+
+        subclass.rebuild_relationships(_relationships || {})
 
         subclass._allowed_filters = (_allowed_filters || Set.new).dup
 
         type = subclass.name.demodulize.sub(/Resource$/, '').underscore
         subclass._type = type.pluralize.to_sym
 
-        subclass.attribute :id, format: :id
+        unless subclass._attributes[:id]
+          subclass.attribute :id, format: :id
+        end
 
         check_reserved_resource_name(subclass._type, subclass.name)
+      end
+
+      def rebuild_relationships(relationships)
+        original_relationships = relationships.deep_dup
+
+        @_relationships = {}
+
+        if original_relationships.is_a?(Hash)
+          original_relationships.each_value do |relationship|
+            options = relationship.options.dup
+            options[:parent_resource] = self
+            _add_relationship(relationship.class, relationship.name, options)
+          end
+        end
       end
 
       def resource_for(type)
@@ -554,6 +567,8 @@ module JSONAPI
         @_model_name = model.to_sym
 
         model_hint(model: @_model_name, resource: self) unless options[:add_model_hint] == false
+
+        rebuild_relationships(_relationships)
       end
 
       def model_hint(model: _model_name, resource: _type)
@@ -585,7 +600,7 @@ module JSONAPI
 
       # Override in your resource to filter the creatable keys
       def creatable_fields(_context = nil)
-        _updatable_relationships | _attributes.keys
+        _updatable_relationships | _attributes.keys - [:id]
       end
 
       # Override in your resource to filter the sortable keys
@@ -641,7 +656,7 @@ module JSONAPI
               associations = _lookup_association_chain([records.model.to_s, *model_names])
               joins_query = _build_joins([records.model, *associations])
 
-              # _sorting is appended to avoid name clashes with manual joins eg. overriden filters
+              # _sorting is appended to avoid name clashes with manual joins eg. overridden filters
               order_by_query = "#{associations.last.name}_sorting.#{column_name} #{direction}"
               records = records.joins(joins_query).order(order_by_query)
             else
@@ -807,7 +822,11 @@ module JSONAPI
       def verify_filter(filter, raw, context = nil)
         filter_values = []
         if raw.present?
-          filter_values += raw.is_a?(String) ? CSV.parse_line(raw) : [raw]
+          begin
+            filter_values += raw.is_a?(String) ? CSV.parse_line(raw) : [raw]
+          rescue CSV::MalformedCSVError
+            filter_values << raw
+          end
         end
 
         strategy = _allowed_filters.fetch(filter, Hash.new)[:verify]
@@ -900,10 +919,11 @@ module JSONAPI
         if _abstract
           return ''
         else
-          return @_model_name if defined?(@_model_name)
+          return @_model_name.to_s if defined?(@_model_name)
           class_name = self.name
           return '' if class_name.nil?
-          return @_model_name = class_name.demodulize.sub(/Resource$/, '')
+          @_model_name = class_name.demodulize.sub(/Resource$/, '')
+          return @_model_name.to_s
         end
       end
 
@@ -974,11 +994,17 @@ module JSONAPI
       def _model_class
         return nil if _abstract
 
-        return @model if defined?(@model)
-        return nil if self.name.to_s.blank? && _model_name.to_s.blank?
-        @model = _model_name.to_s.safe_constantize
-        warn "[MODEL NOT FOUND] Model could not be found for #{self.name}. If this a base Resource declare it as abstract." if @model.nil?
-        @model
+        return @model_class if @model_class
+
+        model_name = _model_name
+        return nil if model_name.to_s.blank?
+
+        @model_class = model_name.to_s.safe_constantize
+        if @model_class.nil?
+          warn "[MODEL NOT FOUND] Model could not be found for #{self.name}. If this is a base Resource declare it as abstract."
+        end
+
+        @model_class
       end
 
       def _allowed_filter?(filter)
@@ -1040,7 +1066,7 @@ module JSONAPI
           cache_ids = pluck_arel_attributes(records, t[_primary_key], t[_cache_field])
           resources = CachedResourceFragment.fetch_fragments(self, serializer, options[:context], cache_ids)
         else
-          resources = resources_for(records, options).map{|r| [r.id, r] }.to_h
+          resources = resources_for(records, options[:context]).map{|r| [r.id, r] }.to_h
         end
 
         preload_included_fragments(resources, records, serializer, options)
@@ -1102,7 +1128,6 @@ module JSONAPI
         include_directives = options[:include_directives]
         return unless include_directives
 
-        relevant_options = options.except(:include_directives, :order, :paginator)
         context = options[:context]
 
         # For each association, including indirect associations, find the target record ids.
@@ -1133,8 +1158,15 @@ module JSONAPI
 
           # For each step on the path, figure out what the actual table name/alias in the join
           # will be, and include the primary key of that table in our list of fields to select
+          non_polymorphic = true
           path.each do |elem|
             relationship = klass._relationships[elem]
+            if relationship.polymorphic
+              # Can't preload through a polymorphic belongs_to association, ResourceSerializer
+              # will just have to bypass the cache and load the real Resource.
+              non_polymorphic = false
+              break
+            end
             assocs_path << relationship.relation_name(options).to_sym
             # Converts [:a, :b, :c] to Rails-style { :a => { :b => :c }}
             ar_hash = assocs_path.reverse.reduce{|memo, step| { step => memo } }
@@ -1148,6 +1180,7 @@ module JSONAPI
             klass = relationship.resource_klass
             pluck_attrs << table[klass._primary_key]
           end
+          next unless non_polymorphic
 
           # Pre-fill empty hashes for each resource up to the end of the path.
           # This allows us to later distinguish between a preload that returned nothing
@@ -1188,7 +1221,7 @@ module JSONAPI
               .map(&:last)
               .reject{|id| target_resources[klass.name].has_key?(id) }
               .uniq
-            found = klass.find({klass._primary_key => sub_res_ids}, relevant_options)
+            found = klass.find({klass._primary_key => sub_res_ids}, context: options[:context])
             target_resources[klass.name].merge! found.map{|r| [r.id, r] }.to_h
           end
 

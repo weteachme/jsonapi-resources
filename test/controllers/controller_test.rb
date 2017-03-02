@@ -423,7 +423,7 @@ class PostsControllerTest < ActionController::TestCase
     assert_cacheable_get :index, params: {sort: 'author.name'}
 
     assert_response :success
-    assert json_response['data'].length > 10, 'there are enough recordsto show sort'
+    assert json_response['data'].length > 10, 'there are enough records to show sort'
     assert_equal '17', json_response['data'][0]['id'], 'nil is at the top'
     assert_equal post.id.to_s, json_response['data'][1]['id'], 'alphabetically first user is second'
   end
@@ -436,6 +436,16 @@ class PostsControllerTest < ActionController::TestCase
     assert json_response['data'].length > 10, 'there are enough records to show sort'
     assert_equal '17', json_response['data'][-1]['id'], 'nil is at the bottom'
     assert_equal post.id.to_s, json_response['data'][-2]['id'], 'alphabetically first user is second last'
+  end
+
+  def test_sorting_by_relationship_field_include
+    post  = create_alphabetically_first_user_and_post
+    assert_cacheable_get :index, params: {include: 'author', sort: 'author.name'}
+
+    assert_response :success
+    assert json_response['data'].length > 10, 'there are enough records to show sort'
+    assert_equal '17', json_response['data'][0]['id'], 'nil is at the top'
+    assert_equal post.id.to_s, json_response['data'][1]['id'], 'alphabetically first user is second'
   end
 
   def test_invalid_sort_param
@@ -1921,6 +1931,75 @@ class TagsControllerTest < ActionController::TestCase
     assert_response :bad_request
     assert_match /99,9,100 is not a valid value for id/, response.body
   end
+
+  def test_nested_includes_sort
+    assert_cacheable_get :index, params: {filter: {id: '6,7,8,9'},
+                                          include: 'posts.tags,posts.author.posts',
+                                          sort: 'name'}
+    assert_response :success
+    assert_equal 4, json_response['data'].size
+    assert_equal 3, json_response['included'].size
+  end
+end
+
+class PicturesControllerTest < ActionController::TestCase
+  def test_pictures_index
+    assert_cacheable_get :index
+    assert_response :success
+    assert_equal 3, json_response['data'].size
+  end
+
+  def test_pictures_index_with_polymorphic_include_one_level
+    assert_cacheable_get :index, params: {include: 'imageable'}
+    assert_response :success
+    assert_equal 3, json_response['data'].size
+    assert_equal 2, json_response['included'].size
+  end
+end
+
+class DocumentsControllerTest < ActionController::TestCase
+  def test_documents_index
+    assert_cacheable_get :index
+    assert_response :success
+    assert_equal 1, json_response['data'].size
+  end
+
+  def test_documents_index_with_polymorphic_include_one_level
+    assert_cacheable_get :index, params: {include: 'pictures'}
+    assert_response :success
+    assert_equal 1, json_response['data'].size
+    assert_equal 1, json_response['included'].size
+  end
+end
+
+class PicturesControllerTest < ActionController::TestCase
+  def test_pictures_index
+    assert_cacheable_get :index
+    assert_response :success
+    assert_equal 3, json_response['data'].size
+  end
+
+  def test_pictures_index_with_polymorphic_include_one_level
+    assert_cacheable_get :index, params: {include: 'imageable'}
+    assert_response :success
+    assert_equal 3, json_response['data'].size
+    assert_equal 2, json_response['included'].size
+  end
+end
+
+class DocumentsControllerTest < ActionController::TestCase
+  def test_documents_index
+    assert_cacheable_get :index
+    assert_response :success
+    assert_equal 1, json_response['data'].size
+  end
+
+  def test_documents_index_with_polymorphic_include_one_level
+    assert_cacheable_get :index, params: {include: 'pictures'}
+    assert_response :success
+    assert_equal 1, json_response['data'].size
+    assert_equal 1, json_response['included'].size
+  end
 end
 
 class ExpenseEntriesControllerTest < ActionController::TestCase
@@ -2439,7 +2518,7 @@ class BooksControllerTest < ActionController::TestCase
     JSONAPI.configuration.use_relationship_reflection = false
   end
 
-  def test_destroy_relationship_has_and_belongs_to_many_refect
+  def test_destroy_relationship_has_and_belongs_to_many_reflect
     JSONAPI.configuration.use_relationship_reflection = true
 
     assert_equal 2, Book.find(2).authors.count
@@ -2450,6 +2529,12 @@ class BooksControllerTest < ActionController::TestCase
 
   ensure
     JSONAPI.configuration.use_relationship_reflection = false
+  end
+
+  def test_index_with_caching_enabled_uses_context
+    assert_cacheable_get :index
+    assert_response :success
+    assert json_response['data'][0]['attributes']['title'] = 'Title'
   end
 end
 
@@ -3554,6 +3639,11 @@ end
 class Api::BoxesControllerTest < ActionController::TestCase
   def test_complex_includes_base
     assert_cacheable_get :index
+    assert_response :success
+  end
+
+  def test_complex_includes_filters_nil_includes
+    assert_cacheable_get :index, params: {include: ',,'}
     assert_response :success
   end
 
