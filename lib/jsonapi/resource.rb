@@ -747,12 +747,22 @@ module JSONAPI
       end
 
       def filter_records(filters, options, records = records(options))
-        records = apply_filters(records, filters, options)
-        apply_includes(records, options)
+        # to allow non-active-record records
+        if filters.is_a?(Array)
+          filters
+        else
+          records = apply_filters(records, filters, options)
+          apply_includes(records, options)
+        end
       end
 
       def sort_records(records, order_options, context = {})
-        apply_sort(records, order_options, context)
+        # to allow non-active-record records
+        if records.is_a?(Array)
+          records
+        else
+          apply_sort(records, order_options, context)
+        end
       end
 
       # Assumes ActiveRecord's counting. Override if you need a different counting method
