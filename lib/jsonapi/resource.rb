@@ -459,6 +459,7 @@ module JSONAPI
         resource = resource_name.safe_constantize if resource_name
 
         if resource.nil?
+          # see if we can find one by add module_prefix
           while resource.nil?
             type_with_module = [module_prefix.underscore, type].join('/')
             resource_name = _resource_name_from_type(type_with_module)
@@ -467,6 +468,19 @@ module JSONAPI
 
             module_prefix = module_prefix.safe_constantize.to_s.deconstantize
             break if module_prefix.blank?
+          end
+
+          # try again see if we can find one by stripping modules out
+          i = 2
+          while resource.nil?
+            modules = resource_name.split('::')
+
+            if modules.length >= i
+              resource_name = modules[0, modules.length-i] << modules.last
+              resource = resource_name.join('::').safe_constantize
+            else
+              break
+            end
           end
 
           if resource.nil?

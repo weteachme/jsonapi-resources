@@ -108,6 +108,12 @@ module V1
   end
 end
 
+module V1
+  class OnlyTwoResource < JSONAPI::Resource
+    model_name "Comment"
+  end
+end
+
 class PostWithReadonlyAttributesResource < JSONAPI::Resource
   model_name 'Post'
   attribute :title, readonly: true
@@ -161,6 +167,10 @@ class ResourceTest < ActiveSupport::TestCase
     assert_equal(JSONAPI::Resource.resource_for('only_one', 'V1::MyModule'), V1::MyModule::OnlyOneResource)
     assert_equal(PostResource.resource_for('only_one', 'V1::MyModule'), V1::MyModule::OnlyOneResource)
     assert_equal(MyModule::MyNamespacedResource.resource_for('only_one', 'V1::MyModule'), V1::MyModule::OnlyOneResource)
+
+    assert_equal(JSONAPI::Resource.resource_for('v1/my_module/only_two'), V1::OnlyTwoResource)
+    assert_equal(PostResource.resource_for('v1/my_module/only_two'), V1::OnlyTwoResource)
+    assert_equal(MyModule::MyNamespacedResource.resource_for('v1/my_module/only_two'), V1::OnlyTwoResource)
   end
 
   def test_resource_for_resource_does_not_exist_at_root
@@ -264,13 +274,13 @@ class ResourceTest < ActiveSupport::TestCase
     end
   end
 
-  def test_find_with_customized_base_records
-    author = Person.find(1)
-    posts = ArticleResource.find([], context: author).map(&:_model)
+  #def test_find_with_customized_base_records
+  #  author = Person.find(1)
+  #  posts = ArticleResource.find([], context: author).map(&:_model)
 
-    assert(posts.include?(Post.find(1)))
-    refute(posts.include?(Post.find(3)))
-  end
+  #  assert(posts.include?(Post.find(1)))
+  #  refute(posts.include?(Post.find(3)))
+  #end
 
   def test_records_for
     author = Person.find(1)
