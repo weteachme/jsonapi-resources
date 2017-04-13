@@ -111,6 +111,7 @@ module JSONAPI
 
     def resource_klass
       @resource_klass ||= resource_klass_name.safe_constantize
+      @resource_klass ||= JSONAPI::Resource.resource_from_name(resource_klass_name)
     end
 
     def resource_serializer_klass

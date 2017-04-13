@@ -470,21 +470,27 @@ module JSONAPI
             break if module_prefix.blank?
           end
 
-          # try again see if we can find one by stripping modules out
-          i = 2
-          while resource.nil?
-            modules = resource_name.split('::')
-
-            if modules.length >= i
-              resource_name = modules[0, modules.length-i] << modules.last
-              resource = resource_name.join('::').safe_constantize
-            else
-              break
-            end
-          end
+          resource ||= resource_from_name(resource_name)
 
           if resource.nil?
             fail NameError, "JSONAPI: Could not find resource '#{type}'. (Class #{resource_name} not found)"
+          end
+        end
+        resource
+      end
+
+      # see if we can find one by stripping modules out
+      def resource_from_name(resource_name)
+        resource = nil
+        i = 2
+        while resource.nil?
+          modules = resource_name.split('::')
+
+          if modules.length >= i
+            resource_name = modules[0, modules.length-i] << modules.last
+            resource = resource_name.join('::').safe_constantize
+          else
+            break
           end
         end
         resource
