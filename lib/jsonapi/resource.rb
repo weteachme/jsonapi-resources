@@ -484,7 +484,7 @@ module JSONAPI
         resource = nil
         i = 2
         while resource.nil?
-          modules = resource_name.split('::')
+          modules = resource_name.split('::').uniq
 
           if modules.length >= i
             resource_name = modules[0, modules.length-i] << modules.last
