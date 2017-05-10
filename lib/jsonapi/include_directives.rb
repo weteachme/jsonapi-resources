@@ -74,7 +74,7 @@ module JSONAPI
     end
 
     def parse_include(include)
-      parts = include.split('.')
+      parts = include.to_s.split('.')
       local_path = ''
 
       parts.each do |name|
