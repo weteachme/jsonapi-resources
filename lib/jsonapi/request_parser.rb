@@ -213,7 +213,7 @@ module JSONAPI
     end
 
     def parse_include_directives(raw_include)
-      return unless raw_include
+      return if raw_include.blank?
 
       unless JSONAPI.configuration.allow_include
         fail JSONAPI::Exceptions::ParametersNotAllowed.new([:include])
@@ -237,7 +237,7 @@ module JSONAPI
     end
 
     def parse_filters(filters)
-      return unless filters
+      return if filters.blank?
 
       unless JSONAPI.configuration.allow_filter
         fail JSONAPI::Exceptions::ParametersNotAllowed.new([:filter])
@@ -266,7 +266,7 @@ module JSONAPI
     end
 
     def parse_sort_criteria(sort_criteria)
-      return unless sort_criteria.present?
+      return if sort_criteria.blank?
 
       unless JSONAPI.configuration.allow_sort
         fail JSONAPI::Exceptions::ParametersNotAllowed.new([:sort])
