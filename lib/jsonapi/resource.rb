@@ -484,7 +484,7 @@ module JSONAPI
         resource = nil
         i = 2
         while resource.nil?
-          modules = resource_name.split('::').uniq
+          modules = resource_name.to_s.split('::').uniq
 
           if modules.length >= i
             resource_name = modules[0, modules.length-i] << modules.last
@@ -694,7 +694,7 @@ module JSONAPI
         if order_options.any?
            order_options.each_pair do |field, direction|
             if field.to_s.include?(".")
-              *model_names, column_name = field.split(".")
+              *model_names, column_name = field.to_s.split(".")
 
               associations = _lookup_association_chain([records.model.to_s, *model_names])
               joins_query = _build_joins([records.model, *associations])

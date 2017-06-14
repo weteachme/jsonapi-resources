@@ -155,7 +155,7 @@ module JSONAPI
       # Extract the fields for each type from the fields parameters
       if fields.is_a?(ActionController::Parameters)
         fields.each do |field, value|
-          resource_fields = value.split(',') unless value.nil? || value.empty?
+          resource_fields = value.to_s.split(',') unless value.nil? || value.empty?
           extracted_fields[field] = resource_fields
         end
       else

@@ -45,7 +45,7 @@ module JSONAPI
     def get_related(current_path)
       current = @include_directives_hash
       current_resource_klass = @resource_klass
-      current_path.split('.').each do |fragment|
+      current_path.to_s.split('.').each do |fragment|
         fragment = fragment.to_sym
 
         if current_resource_klass

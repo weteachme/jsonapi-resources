@@ -129,7 +129,7 @@ module JSONAPI
       #@resources_path_cache.get(source_klass)
       path = formatted_module_path_from_class(source_klass) +
         format_route(source_klass._type.to_s)
-      path.split('/').uniq.join('/')
+      path.to_s.split('/').uniq.join('/')
     end
 
     def regular_primary_resources_path
