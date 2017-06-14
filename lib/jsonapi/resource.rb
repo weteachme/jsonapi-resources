@@ -556,11 +556,18 @@ module JSONAPI
         end unless method_defined?(attr)
 
         define_method "#{attr}=" do |value|
-          if value.is_a?(ActionController::Parameters)
-            value = value.to_unsafe_h.deep_symbolize_keys
-          end
-          @model.public_send("#{options[:delegate] ? options[:delegate].to_sym : attr}=", value)
+          @model.public_send("#{options[:delegate] ? options[:delegate].to_sym : attr}=", JSONAPI::Resource.to_unsafe_hash(value))
         end unless method_defined?("#{attr}=")
+      end
+
+      def to_unsafe_hash(value)
+        if value.is_a?(ActionController::Parameters)
+          value.to_unsafe_h.deep_symbolize_keys
+        elsif value.is_a?(Array)
+          value.map { |v| to_unsafe_hash(v) }
+        else
+          value
+        end
       end
 
       def default_attribute_options
