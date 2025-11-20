@@ -5,7 +5,7 @@ module JSONAPI
       ActionController::Rendering,
       ActionController::Renderers::All,
       ActionController::StrongParameters,
-      ActionController::ForceSSL,
+      # ActionController::ForceSSL,
       ActionController::Instrumentation,
       JSONAPI::ActsAsResourceController
     ].freeze
