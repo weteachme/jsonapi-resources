@@ -274,7 +274,8 @@ module JSONAPI
 
       sorts = []
       begin
-        raw = URI.unescape(sort_criteria)
+        # warning: URI.unescape is obsolete
+        raw = URI.decode_www_form_component(sort_criteria)
         sorts += CSV.parse_line(raw)
       rescue CSV::MalformedCSVError
         fail JSONAPI::Exceptions::InvalidSortCriteria.new(format_key(@resource_klass._type), raw)

@@ -836,7 +836,8 @@ module JSONAPI
       def find_by_key(key, options = {})
         context = options[:context]
         records = find_records({_primary_key => key}, options.except(:paginator, :sort_criteria))
-        model = records.first
+        # DEPRECATION WARNING: `.reorder({})` with `.first` / `.first!` no longer takes non-deterministic result in Rails 7.0. To continue taking non-deterministic result, use `.take` / `.take!` instead.
+        model = records.take
         fail JSONAPI::Exceptions::RecordNotFound.new(key) if model.nil?
         self.resource_for_model(model).new(model, context)
       end
