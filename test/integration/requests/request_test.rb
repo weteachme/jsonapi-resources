@@ -381,7 +381,7 @@ class RequestTest < ActionDispatch::IntegrationTest
 
     assert_equal 400, status
     assert_equal 'Bad Request', json_response['errors'][0]['title']
-    assert_match 'unexpected token at', json_response['errors'][0]['detail']
+    assert_match(/unexpected token at|after object value/, json_response['errors'][0]['detail'])
   end
 
   def test_put_valid_json_but_array

@@ -1,27 +1,19 @@
-require "codeclimate-test-reporter"
-require 'simplecov'
-
 # To run tests with coverage:
 # COVERAGE=true bundle exec rake test
 
-# To test on a specific rails version use this:
-# export RAILS_VERSION=4.2.6; bundle update rails; bundle exec rake test
-# export RAILS_VERSION=5.0.0; bundle update rails; bundle exec rake test
-
-# We are no longer having Travis test Rails 4.1.x., but you can try it with:
-# export RAILS_VERSION=4.1.0; bundle update rails; bundle exec rake test
-
-# To Switch rails versions and run a particular test order:
-# export RAILS_VERSION=4.2.6; bundle update rails; bundle exec rake TESTOPTS="--seed=39333" test
+# This harness is tested against Rails 7.2.3, 8.0.0 and 8.1.0 (use the full
+# three-component version — a two-part value like 8.0 resolves to 8.1):
+#
+#   docker run --rm -v "$PWD":/app -v jr-bundle:/usr/local/bundle -w /app \
+#     -e RAILS_VERSION=8.0.0 ruby:3.3 sh -c 'rm -f Gemfile.lock && bundle install && bundle exec rake test'
 
 if ENV['COVERAGE']
+  require 'simplecov'
   SimpleCov.start do
   end
 end
 
 require 'active_record/railtie'
-require 'rails/test_help'
-require 'minitest/mock'
 require 'jsonapi-resources'
 require 'pry'
 
@@ -61,6 +53,8 @@ class TestApp < Rails::Application
   end
 end
 
+require 'rails/test_help'
+
 module MyEngine
   class Engine < ::Rails::Engine
     isolate_namespace MyEngine
@@ -76,7 +70,7 @@ end
 # Monkeypatch ActionController::TestCase to delete the RAW_POST_DATA on subsequent calls in the same test.
 if Rails::VERSION::MAJOR >= 5
   module ClearRawPostHeader
-    def process(action, *args)
+    def process(action, **args)
       @request.delete_header 'RAW_POST_DATA'
       super
     end
@@ -418,12 +412,12 @@ class Minitest::Test
     true
   end
 
-  self.fixture_path = "#{Rails.root}/fixtures"
+  self.fixture_paths = ["#{Rails.root}/fixtures"]
   fixtures :all
 end
 
 class ActiveSupport::TestCase
-  self.fixture_path = "#{Rails.root}/fixtures"
+  self.fixture_paths = ["#{Rails.root}/fixtures"]
   fixtures :all
   setup do
     @routes = TestApp.routes
@@ -431,7 +425,7 @@ class ActiveSupport::TestCase
 end
 
 class ActionDispatch::IntegrationTest
-  self.fixture_path = "#{Rails.root}/fixtures"
+  self.fixture_paths = ["#{Rails.root}/fixtures"]
   fixtures :all
 
   def assert_jsonapi_response(expected_status, msg = nil)
@@ -482,13 +476,13 @@ class ActionDispatch::IntegrationTest
 end
 
 class ActionController::TestCase
-  def assert_cacheable_get(action, *args)
+  def assert_cacheable_get(action, **args)
     assert_nil JSONAPI.configuration.resource_cache
 
     normal_queries = []
     normal_query_callback = lambda {|_, _, _, _, payload| normal_queries.push payload[:sql] }
     ActiveSupport::Notifications.subscribed(normal_query_callback, 'sql.active_record') do
-      get action, *args
+      get action, **args
     end
     non_caching_response = json_response_sans_backtraces
     non_caching_status = response.status
@@ -522,7 +516,7 @@ class ActionController::TestCase
               @controller = nil
               setup_controller_request_and_response
               @request.headers.merge!(orig_request_headers.dup)
-              get action, *args
+              get action, **args
             end
           end
         rescue Exception
