@@ -3,9 +3,8 @@ source 'https://rubygems.org'
 gemspec
 
 platforms :ruby do
-  gem 'sqlite3', '1.3.10'
+  gem 'sqlite3'
   gem 'simplecov', group: :test
-  gem "codeclimate-test-reporter", group: :test, require: nil
 end
 
 version = ENV['RAILS_VERSION'] || 'default'
